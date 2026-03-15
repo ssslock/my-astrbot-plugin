@@ -45,7 +45,7 @@ class MyPlugin(Star):
                                         # Look for the user identifier line
                                         if line.startswith('User ID:'):
                                             # Check if role is already present
-                                            if f', Role: {event.role}' not in line:
+                                            if f'Role: ' not in line:
                                                 # Add role to the line
                                                 lines[i] = f'{line}, Role: {event.role}'
                                                 # Update the TextPart
