@@ -29,29 +29,27 @@ class MyPlugin(Star):
                 # Create a wrapper function
                 def patched_function(event, req, cfg, timezone):
                     # First, call the original function
+                    logger.info("patched_function 1")
                     self._original_append_system_reminders(event, req, cfg, timezone)
                     
+                    logger.info("patched_function 2")
                     # If event.role exists and is truthy, modify the system reminder
-                    if hasattr(event, 'role') and event.role:
+                    if hasattr(event, 'role'):
                         # Look for TextParts that contain system reminder
+                        logger.info("patched_function 3")
                         for part in req.extra_user_content_parts:
+                            logger.info("patched_function 4")
                             if isinstance(part, TextPart):
+                                logger.info("patched_function 5")
                                 text = part.text
+                                logger.info("patched_function 6 - text: " + text)
                                 # Check if this is a system reminder
                                 if text.startswith('<system_reminder>') and text.endswith('</system_reminder>'):
                                     # Find the user identifier line and add role
                                     lines = text.split('\n')
-                                    for i, line in enumerate(lines):
-                                        # Look for the user identifier line
-                                        if line.startswith('User ID:'):
-                                            # Check if role is already present
-                                            if f'Role: ' not in line:
-                                                # Add role to the line
-                                                lines[i] = f'{line}, Role: {event.role}'
-                                                # Update the TextPart
-                                                part.text = '\n'.join(lines)
-                                                logger.debug(f"Added role {event.role} to system reminder")
-                                                break
+                                    lines.append(f'Role: {event.role}')  # Add role as a new line
+                                    part.text = '\n'.join(lines)
+                                    logger.info(f"Added role {event.role} to system reminder")
                                     break
                 
                 # Replace the function in the module
