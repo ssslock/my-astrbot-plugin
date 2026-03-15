@@ -1,8 +1,11 @@
 from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
+from astrbot.core.agent.message import TextPart
 import importlib
 import inspect
+import datetime
+import zoneinfo
 
 @register("helloworld", "YourName", "一个简单的 Hello World 插件", "1.0.0")
 class MyPlugin(Star):
@@ -25,15 +28,45 @@ class MyPlugin(Star):
                 
                 # Create a wrapper function
                 def patched_function(event, req, cfg, timezone):
-                    logger.info("Custom _append_system_reminders called")
-                    # Add your custom logic here
-                    # For example, you could modify the behavior before calling the original
-                    
-                    # You can inspect or modify parameters
-                    logger.info(f"Event: {event}, Config: {cfg}, Timezone: {timezone}")
-                    
-                    # Call the original function
-                    return self._original_append_system_reminders(event, req, cfg, timezone)
+                    system_parts: list[str] = []
+                    if cfg.get("identifier"):
+                        user_id = event.message_obj.sender.user_id
+                        user_nickname = event.message_obj.sender.nickname
+                        if event.role:
+                            system_parts.append(f"User ID: {user_id}, Nickname: {user_nickname}, Role: {event.role}")
+                        else:
+                            system_parts.append(f"User ID: {user_id}, Nickname: {user_nickname}")
+
+                    if cfg.get("group_name_display") and event.message_obj.group_id:
+                        if not event.message_obj.group:
+                            logger.error(
+                                "Group name display enabled but group object is None. Group ID: %s",
+                                event.message_obj.group_id,
+                            )
+                        else:
+                            group_name = event.message_obj.group.group_name
+                            if group_name:
+                                system_parts.append(f"Group name: {group_name}")
+
+                    if cfg.get("datetime_system_prompt"):
+                        current_time = None
+                        if timezone:
+                            try:
+                                now = datetime.datetime.now(zoneinfo.ZoneInfo(timezone))
+                                current_time = now.strftime("%Y-%m-%d %H:%M (%Z)")
+                            except Exception as exc:  # noqa: BLE001
+                                logger.error("时区设置错误: %s, 使用本地时区", exc)
+                        if not current_time:
+                            current_time = (
+                                datetime.datetime.now().astimezone().strftime("%Y-%m-%d %H:%M (%Z)")
+                            )
+                        system_parts.append(f"Current datetime: {current_time}")
+
+                    if system_parts:
+                        system_content = (
+                            "<system_reminder>" + "\n".join(system_parts) + "</system_reminder>"
+                        )
+                        req.extra_user_content_parts.append(TextPart(text=system_content))
                 
                 # Replace the function in the module
                 module._append_system_reminders = patched_function
@@ -44,12 +77,6 @@ class MyPlugin(Star):
             
         except Exception as e:
             logger.error(f"Failed to monkey patch _append_system_reminders: {e}")
-
-    @filter.event_message_type(filter.EventMessageType.ALL)
-    async def on_all_message(self, event: AstrMessageEvent):
-        logger.info("setting role")
-        event.message_obj.role = event.role # 用户的角色
-        logger.info(f"role set: {event.message_obj.role} with {event.role}")
 
     async def terminate(self):
         """可选择实现异步的插件销毁方法，当插件被卸载/停用时会调用。"""
