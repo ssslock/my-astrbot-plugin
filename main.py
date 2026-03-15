@@ -11,7 +11,8 @@ class MyPlugin(Star):
         """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
 
     @filter.permission_type(filter.PermissionType.ADMIN)
-    async def helloworld(self, event: AstrMessageEvent):
+    @filter.event_message_type(filter.EventMessageType.ALL)
+    async def on_all_message(self, event: AstrMessageEvent):
         event.message_obj.role = event.role # 用户的角色
         logger.info("role set for admin")
 
