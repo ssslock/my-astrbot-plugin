@@ -28,45 +28,31 @@ class MyPlugin(Star):
                 
                 # Create a wrapper function
                 def patched_function(event, req, cfg, timezone):
-                    system_parts: list[str] = []
-                    if cfg.get("identifier"):
-                        user_id = event.message_obj.sender.user_id
-                        user_nickname = event.message_obj.sender.nickname
-                        if event.role:
-                            system_parts.append(f"User ID: {user_id}, Nickname: {user_nickname}, Role: {event.role}")
-                        else:
-                            system_parts.append(f"User ID: {user_id}, Nickname: {user_nickname}")
-
-                    if cfg.get("group_name_display") and event.message_obj.group_id:
-                        if not event.message_obj.group:
-                            logger.error(
-                                "Group name display enabled but group object is None. Group ID: %s",
-                                event.message_obj.group_id,
-                            )
-                        else:
-                            group_name = event.message_obj.group.group_name
-                            if group_name:
-                                system_parts.append(f"Group name: {group_name}")
-
-                    if cfg.get("datetime_system_prompt"):
-                        current_time = None
-                        if timezone:
-                            try:
-                                now = datetime.datetime.now(zoneinfo.ZoneInfo(timezone))
-                                current_time = now.strftime("%Y-%m-%d %H:%M (%Z)")
-                            except Exception as exc:  # noqa: BLE001
-                                logger.error("时区设置错误: %s, 使用本地时区", exc)
-                        if not current_time:
-                            current_time = (
-                                datetime.datetime.now().astimezone().strftime("%Y-%m-%d %H:%M (%Z)")
-                            )
-                        system_parts.append(f"Current datetime: {current_time}")
-
-                    if system_parts:
-                        system_content = (
-                            "<system_reminder>" + "\n".join(system_parts) + "</system_reminder>"
-                        )
-                        req.extra_user_content_parts.append(TextPart(text=system_content))
+                    # First, call the original function
+                    self._original_append_system_reminders(event, req, cfg, timezone)
+                    
+                    # If event.role exists and is truthy, modify the system reminder
+                    if hasattr(event, 'role') and event.role:
+                        # Look for TextParts that contain system reminder
+                        for part in req.extra_user_content_parts:
+                            if isinstance(part, TextPart):
+                                text = part.text
+                                # Check if this is a system reminder
+                                if text.startswith('<system_reminder>') and text.endswith('</system_reminder>'):
+                                    # Find the user identifier line and add role
+                                    lines = text.split('\n')
+                                    for i, line in enumerate(lines):
+                                        # Look for the user identifier line
+                                        if line.startswith('User ID:'):
+                                            # Check if role is already present
+                                            if f', Role: {event.role}' not in line:
+                                                # Add role to the line
+                                                lines[i] = f'{line}, Role: {event.role}'
+                                                # Update the TextPart
+                                                part.text = '\n'.join(lines)
+                                                logger.debug(f"Added role {event.role} to system reminder")
+                                                break
+                                    break
                 
                 # Replace the function in the module
                 module._append_system_reminders = patched_function
