@@ -8,54 +8,42 @@ import inspect
 class MyPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
-        self._original_append_system_reminder = None
-        self._patched_class = None
+        self._original_append_system_reminders = None
+        self._patched_module = None
 
     async def initialize(self):
         """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
-        # Monkey patch _append_system_reminder
+        # Monkey patch _append_system_reminders (note: it's a function, not a method)
         try:
-            # Import the module containing the class
+            # Import the module containing the function
             module = importlib.import_module('astrbot.core.astr_main_agent')
-            # Find the class that contains _append_system_reminder
-            # Look for a class with the method
-            target_class = None
-            for name in dir(module):
-                obj = getattr(module, name)
-                if isinstance(obj, type) and hasattr(obj, '_append_system_reminder'):
-                    target_class = obj
-                    break
+            self._patched_module = module
             
-            if target_class is None:
-                logger.warning("Could not find class with _append_system_reminder method")
+            # Save the original function
+            if hasattr(module, '_append_system_reminders'):
+                self._original_append_system_reminders = module._append_system_reminders
+                
+                # Create a wrapper function
+                def patched_function(event, req, cfg, timezone):
+                    logger.info("Custom _append_system_reminders called")
+                    # Add your custom logic here
+                    # For example, you could modify the behavior before calling the original
+                    
+                    # You can inspect or modify parameters
+                    logger.info(f"Event: {event}, Config: {cfg}, Timezone: {timezone}")
+                    
+                    # Call the original function
+                    return self._original_append_system_reminders(event, req, cfg, timezone)
+                
+                # Replace the function in the module
+                module._append_system_reminders = patched_function
+                logger.info("Successfully patched _append_system_reminders")
+            else:
+                logger.warning("Could not find _append_system_reminders function in module")
                 return
             
-            self._patched_class = target_class
-            # Save the original method
-            original_method = getattr(target_class, '_append_system_reminder')
-            self._original_append_system_reminder = original_method
-            
-            # Create a wrapper function
-            # We need to capture original_method in a closure
-            if inspect.iscoroutinefunction(original_method):
-                async def patched_method(self_instance, *args, **kwargs):
-                    logger.info("Custom _append_system_reminder called (async)")
-                    # Add your custom logic here
-                    # For now, just call the original
-                    return await original_method(self_instance, *args, **kwargs)
-            else:
-                def patched_method(self_instance, *args, **kwargs):
-                    logger.info("Custom _append_system_reminder called (sync)")
-                    # Add your custom logic here
-                    # For now, just call the original
-                    return original_method(self_instance, *args, **kwargs)
-            
-            # Replace the method
-            setattr(target_class, '_append_system_reminder', patched_method)
-            logger.info("Successfully patched _append_system_reminder")
-            
         except Exception as e:
-            logger.error(f"Failed to monkey patch _append_system_reminder: {e}")
+            logger.error(f"Failed to monkey patch _append_system_reminders: {e}")
 
     @filter.event_message_type(filter.EventMessageType.ALL)
     async def on_all_message(self, event: AstrMessageEvent):
@@ -65,7 +53,7 @@ class MyPlugin(Star):
 
     async def terminate(self):
         """可选择实现异步的插件销毁方法，当插件被卸载/停用时会调用。"""
-        # Restore the original method
-        if self._patched_class is not None and self._original_append_system_reminder is not None:
-            setattr(self._patched_class, '_append_system_reminder', self._original_append_system_reminder)
-            logger.info("Restored original _append_system_reminder")
+        # Restore the original function
+        if self._patched_module is not None and self._original_append_system_reminders is not None:
+            self._patched_module._append_system_reminders = self._original_append_system_reminders
+            logger.info("Restored original _append_system_reminders")
