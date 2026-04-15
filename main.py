@@ -15,61 +15,61 @@ class MyPlugin(Star):
         self.conversation_timezone_path = Path(__file__).parent / "conversations"
         self.conversation_timezone_path.mkdir(parents=True, exist_ok=True)
 
-    # @filter.on_llm_request()
-    # async def on_llm_request(self, event: AstrMessageEvent, req: ProviderRequest):
-    #     """Event handler for LLM requests to append local timestamp and role to extra_user_content_parts."""
-    #     try:
-    #         # Get conversation ID and timezone
-    #         conv_mgr = self.context.conversation_manager
-    #         umo = event.unified_msg_origin
-    #         conversation_id = await conv_mgr.get_curr_conversation_id(umo)
+    @filter.on_llm_request()
+    async def on_llm_request(self, event: AstrMessageEvent, req: ProviderRequest):
+        """Event handler for LLM requests to append local timestamp and role to extra_user_content_parts."""
+        try:
+            # Get conversation ID and timezone
+            conv_mgr = self.context.conversation_manager
+            umo = event.unified_msg_origin
+            conversation_id = await conv_mgr.get_curr_conversation_id(umo)
             
-    #         # Default to UTC+8 if no conversation exists or no timezone set
-    #         timezone_offset = 8  # Default UTC+8
+            # Default to UTC+8 if no conversation exists or no timezone set
+            timezone_offset = 8  # Default UTC+8
             
-    #         if conversation_id:
-    #             stored_offset = await self._get_conversation_timezone(conversation_id)
-    #             if stored_offset is not None:
-    #                 timezone_offset = stored_offset
+            if conversation_id:
+                stored_offset = await self._get_conversation_timezone(conversation_id)
+                if stored_offset is not None:
+                    timezone_offset = stored_offset
             
-    #         # Parse the current time in local timezone based on offset
-    #         try:
-    #             # Create timezone with the offset
-    #             local_tz = timezone(timedelta(hours=timezone_offset))
-    #             now_local = datetime.now(local_tz)
+            # Parse the current time in local timezone based on offset
+            try:
+                # Create timezone with the offset
+                local_tz = timezone(timedelta(hours=timezone_offset))
+                now_local = datetime.now(local_tz)
                 
-    #             # Format timezone string (e.g., UTC+8 or UTC-5)
-    #             tz_sign = '+' if timezone_offset >= 0 else ''
-    #             tz_str = f"UTC{tz_sign}{timezone_offset}"
+                # Format timezone string (e.g., UTC+8 or UTC-5)
+                tz_sign = '+' if timezone_offset >= 0 else ''
+                tz_str = f"UTC{tz_sign}{timezone_offset}"
                 
-    #             current_time_local = now_local.strftime(f"%Y-%m-%d %H:%M ({tz_str})")
+                current_time_local = now_local.strftime(f"%Y-%m-%d %H:%M ({tz_str})")
                 
-    #             # Prepare the system reminder lines
-    #             system_parts = []
-    #             system_parts.append(f"Local datetime: {current_time_local}")
+                # Prepare the system reminder lines
+                system_parts = []
+                system_parts.append(f"Local datetime: {current_time_local}")
                 
-    #             # Add role if event has role attribute
-    #             if hasattr(event.message_obj, 'sender') and hasattr(event.message_obj.sender, 'role'):
-    #                 role = event.message_obj.sender.role
-    #                 if role:
-    #                     system_parts.append(f"Role: {role}")
+                # Add role if event has role attribute
+                if hasattr(event.message_obj, 'sender') and hasattr(event.message_obj.sender, 'role'):
+                    role = event.message_obj.sender.role
+                    if role:
+                        system_parts.append(f"Role: {role}")
                 
-    #             # Create the complete system reminder block in the same format as astr_main_agent.py
-    #             system_content = "<system_reminder>" + "\n".join(system_parts) + "</system_reminder>"
+                # Create the complete system reminder block in the same format as astr_main_agent.py
+                system_content = "<system_reminder>" + "\n".join(system_parts) + "</system_reminder>"
                 
-    #             # Initialize extra_user_content_parts if None (safety check)
-    #             if req.extra_user_content_parts is None:
-    #                 req.extra_user_content_parts = []
+                # Initialize extra_user_content_parts if None (safety check)
+                if req.extra_user_content_parts is None:
+                    req.extra_user_content_parts = []
                 
-    #             # Append to extra_user_content_parts as a TextPart
-    #             req.extra_user_content_parts.append(TextPart(text=system_content))
+                # Append to extra_user_content_parts as a TextPart
+                req.extra_user_content_parts.append(TextPart(text=system_content))
                 
-    #             logger.debug(f"Appended local time system reminder to extra_user_content_parts: {current_time_local}")
+                logger.debug(f"Appended local time system reminder to extra_user_content_parts: {current_time_local}")
                 
-    #         except Exception as e:
-    #             logger.error(f"Error processing time for system reminder: {e}")
-    #     except Exception as e:
-    #         logger.error(f"Error in on_llm_request handler: {e}")
+            except Exception as e:
+                logger.error(f"Error processing time for system reminder: {e}")
+        except Exception as e:
+            logger.error(f"Error in on_llm_request handler: {e}")
 
     async def initialize(self):
         """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
