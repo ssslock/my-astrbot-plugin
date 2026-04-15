@@ -28,8 +28,8 @@ class MyPlugin(Star):
                 
                 # Create a wrapper function
                 def patched_function(event, req, cfg, timezone):
-                    # First, call the original function
-                    self._original_append_system_reminders(event, req, cfg, timezone)
+                    # First, call the original function with UTC timezone
+                    self._original_append_system_reminders(event, req, cfg, 'UTC')
                     
                     # If event.role exists and is truthy, modify the system reminder
                     if hasattr(event, 'role'):
