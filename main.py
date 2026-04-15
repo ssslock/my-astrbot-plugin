@@ -13,34 +13,33 @@ class MyPlugin(Star):
 
     @filter.on_llm_request()
     async def on_llm_request(self, event: AstrMessageEvent, req: ProviderRequest):
-        """Event handler for LLM requests to modify system reminders."""
+        """Event handler for LLM requests to append UTC timestamp and role to system prompt."""
         try:
-            # Look for TextParts that contain system reminder
-            for part in req.extra_user_content_parts:
-                if isinstance(part, TextPart):
-                    text = part.text
-                    # Check if this is a system reminder
-                    if text.startswith('<system_reminder>') and text.endswith('</system_reminder>'):
-                        # Parse the current time in UTC
-                        try:
-                            now_utc = datetime.datetime.now(zoneinfo.ZoneInfo('UTC'))
-                            current_time_utc = now_utc.strftime("%Y-%m-%d %H:%M (%Z)")
-                            
-                            # Find and replace the datetime line
-                            lines = text.split('\n')
-                            for i, line in enumerate(lines):
-                                if line.strip().startswith('Current datetime:'):
-                                    lines[i] = f'Current datetime: {current_time_utc}'
-                                    break
-                            
-                            # Add role if event has role attribute
-                            if hasattr(event, 'role') and event.role:
-                                lines.append(f'Role: {event.role}')
-                            
-                            part.text = '\n'.join(lines)
-                            logger.debug("Modified system reminder to UTC and added role")
-                        except Exception as e:
-                            logger.error(f"Error processing time in system reminder: {e}")
+            # Parse the current time in UTC
+            try:
+                now_utc = datetime.datetime.now(zoneinfo.ZoneInfo('UTC'))
+                current_time_utc = now_utc.strftime("%Y-%m-%d %H:%M (%Z)")
+                
+                # Prepare the system reminder text
+                system_reminder_lines = []
+                system_reminder_lines.append(f"Current datetime: {current_time_utc}")
+                
+                # Add role if event has role attribute
+                if hasattr(event, 'role') and event.role:
+                    system_reminder_lines.append(f"Role: {event.role}")
+                
+                # Create the complete system reminder block
+                system_reminder_text = "<system_reminder>\n" + "\n".join(system_reminder_lines) + "\n</system_reminder>"
+                
+                # Append to system_prompt
+                if req.system_prompt is None:
+                    req.system_prompt = ""
+                req.system_prompt += f"\n{system_reminder_text}\n"
+                
+                logger.debug(f"Appended UTC system reminder to system_prompt: {current_time_utc}")
+                
+            except Exception as e:
+                logger.error(f"Error processing time for system reminder: {e}")
         except Exception as e:
             logger.error(f"Error in on_llm_request handler: {e}")
 
