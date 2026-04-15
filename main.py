@@ -3,8 +3,7 @@ from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
 from astrbot.core.agent.message import TextPart
 from astrbot.core.provider.entities import ProviderRequest
-import datetime
-import zoneinfo
+from datetime import datetime, timezone, timedelta
 import asyncio
 from pathlib import Path
 
@@ -18,21 +17,38 @@ class MyPlugin(Star):
 
     @filter.on_llm_request()
     async def on_llm_request(self, event: AstrMessageEvent, req: ProviderRequest):
-        """Event handler for LLM requests to append UTC timestamp and role to extra_user_content_parts."""
+        """Event handler for LLM requests to append local timestamp and role to extra_user_content_parts."""
         try:
-            # Parse the current time in UTC
+            # Get conversation ID and timezone
+            conv_mgr = self.context.conversation_manager
+            umo = event.unified_msg_origin
+            conversation_id = await conv_mgr.get_curr_conversation_id(umo)
+            
+            # Default to UTC+8 if no conversation exists or no timezone set
+            timezone_offset = 8  # Default UTC+8
+            
+            if conversation_id:
+                stored_offset = await self._get_conversation_timezone(conversation_id)
+                if stored_offset is not None:
+                    timezone_offset = stored_offset
+            
+            # Parse the current time in local timezone based on offset
             try:
-                now_utc = datetime.datetime.now(zoneinfo.ZoneInfo('UTC'))
-                current_time_utc = now_utc.strftime("%Y-%m-%d %H:%M (%Z)")
+                # Create timezone with the offset
+                local_tz = timezone(timedelta(hours=timezone_offset))
+                now_local = datetime.now(local_tz)
+                
+                # Format timezone string (e.g., UTC+8 or UTC-5)
+                tz_sign = '+' if timezone_offset >= 0 else ''
+                tz_str = f"UTC{tz_sign}{timezone_offset}"
+                
+                current_time_local = now_local.strftime(f"%Y-%m-%d %H:%M ({tz_str})")
                 
                 # Prepare the system reminder lines
                 system_parts = []
-                system_parts.append(f"Current datetime: {current_time_utc}")
+                system_parts.append(f"Local datetime: {current_time_local}")
                 
                 # Add role if event has role attribute
-                # Note: Looking at the event structure, we might need to check for role differently
-                # The original code checks if hasattr(event, 'role') and event.role
-                # But based on the context.py structure, we should check the message object
                 if hasattr(event.message_obj, 'sender') and hasattr(event.message_obj.sender, 'role'):
                     role = event.message_obj.sender.role
                     if role:
@@ -48,7 +64,7 @@ class MyPlugin(Star):
                 # Append to extra_user_content_parts as a TextPart
                 req.extra_user_content_parts.append(TextPart(text=system_content))
                 
-                logger.debug(f"Appended UTC system reminder to extra_user_content_parts: {current_time_utc}")
+                logger.debug(f"Appended local time system reminder to extra_user_content_parts: {current_time_local}")
                 
             except Exception as e:
                 logger.error(f"Error processing time for system reminder: {e}")
