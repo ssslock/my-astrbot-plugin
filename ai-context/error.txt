@@ -1,0 +1,5 @@
+[2026-03-16 10:35:06.363] [Core] [INFO] [core.event_bus:61]: [prickett] [Prickett(aiocqhttp)] 3slock/365375602: 你看下现在是不是多了两个工具 
+[2026-03-16 10:35:06.818] [Core] [INFO] [respond.stage:184]: Prepare to send - 3slock/365375602: 
+[2026-03-16 10:35:06.818] [Core] [INFO] [respond.stage:200]: 应用流式输出(Prickett)
+[2026-03-16 10:36:06.349] [Core] [INFO] [runners.tool_loop_agent_runner:657]: Agent 使用工具: []
+[2026-03-16 10:36:06.518] [Core] [WARN] [v4.20.0] [runners.tool_loop_agent_runner:268]: Chat Model deepseek/deepseek-chat request error: Error code: 400 - {'error': {'message': "Invalid 'messages[72].tool_calls': empty array. Expected an array with minimum length 1, but got an empty array instead.", 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_request_error'}}
