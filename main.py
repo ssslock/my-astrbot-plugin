@@ -2,8 +2,7 @@ from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
 from astrbot.core.agent.message import TextPart
-import importlib
-import inspect
+from astrbot.core.provider.entities import ProviderRequest
 import datetime
 import zoneinfo
 
@@ -11,53 +10,44 @@ import zoneinfo
 class MyPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
-        self._original_append_system_reminders = None
-        self._patched_module = None
+
+    @filter.on_llm_request()
+    async def on_llm_request(self, event: AstrMessageEvent, req: ProviderRequest):
+        """Event handler for LLM requests to modify system reminders."""
+        try:
+            # Look for TextParts that contain system reminder
+            for part in req.extra_user_content_parts:
+                if isinstance(part, TextPart):
+                    text = part.text
+                    # Check if this is a system reminder
+                    if text.startswith('<system_reminder>') and text.endswith('</system_reminder>'):
+                        # Parse the current time in UTC
+                        try:
+                            now_utc = datetime.datetime.now(zoneinfo.ZoneInfo('UTC'))
+                            current_time_utc = now_utc.strftime("%Y-%m-%d %H:%M (%Z)")
+                            
+                            # Find and replace the datetime line
+                            lines = text.split('\n')
+                            for i, line in enumerate(lines):
+                                if line.strip().startswith('Current datetime:'):
+                                    lines[i] = f'Current datetime: {current_time_utc}'
+                                    break
+                            
+                            # Add role if event has role attribute
+                            if hasattr(event, 'role') and event.role:
+                                lines.append(f'Role: {event.role}')
+                            
+                            part.text = '\n'.join(lines)
+                            logger.debug("Modified system reminder to UTC and added role")
+                        except Exception as e:
+                            logger.error(f"Error processing time in system reminder: {e}")
+        except Exception as e:
+            logger.error(f"Error in on_llm_request handler: {e}")
 
     async def initialize(self):
         """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
-        # Monkey patch _append_system_reminders (note: it's a function, not a method)
-        try:
-            # Import the module containing the function
-            module = importlib.import_module('astrbot.core.astr_main_agent')
-            self._patched_module = module
-            
-            # Save the original function
-            if hasattr(module, '_append_system_reminders'):
-                self._original_append_system_reminders = module._append_system_reminders
-                
-                # Create a wrapper function
-                def patched_function(event, req, cfg, timezone):
-                    # First, call the original function with UTC timezone
-                    self._original_append_system_reminders(event, req, cfg, 'UTC')
-                    
-                    # If event.role exists and is truthy, modify the system reminder
-                    if hasattr(event, 'role'):
-                        # Look for TextParts that contain system reminder
-                        for part in req.extra_user_content_parts:
-                            if isinstance(part, TextPart):
-                                text = part.text
-                                # Check if this is a system reminder
-                                if text.startswith('<system_reminder>') and text.endswith('</system_reminder>'):
-                                    # Find the user identifier line and add role
-                                    lines = text.split('\n')
-                                    lines.append(f'Role: {event.role}')  # Add role as a new line
-                                    part.text = '\n'.join(lines)
-                                    break
-                
-                # Replace the function in the module
-                module._append_system_reminders = patched_function
-                logger.info("Successfully patched _append_system_reminders")
-            else:
-                logger.warning("Could not find _append_system_reminders function in module")
-                return
-            
-        except Exception as e:
-            logger.error(f"Failed to monkey patch _append_system_reminders: {e}")
+        logger.info("HelloWorld plugin initialized using event handler approach")
 
     async def terminate(self):
         """可选择实现异步的插件销毁方法，当插件被卸载/停用时会调用。"""
-        # Restore the original function
-        if self._patched_module is not None and self._original_append_system_reminders is not None:
-            self._patched_module._append_system_reminders = self._original_append_system_reminders
-            logger.info("Restored original _append_system_reminders")
+        logger.info("HelloWorld plugin terminated")
