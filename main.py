@@ -13,30 +13,37 @@ class MyPlugin(Star):
 
     @filter.on_llm_request()
     async def on_llm_request(self, event: AstrMessageEvent, req: ProviderRequest):
-        """Event handler for LLM requests to append UTC timestamp and role to system prompt."""
+        """Event handler for LLM requests to append UTC timestamp and role to extra_user_content_parts."""
         try:
             # Parse the current time in UTC
             try:
                 now_utc = datetime.datetime.now(zoneinfo.ZoneInfo('UTC'))
                 current_time_utc = now_utc.strftime("%Y-%m-%d %H:%M (%Z)")
                 
-                # Prepare the system reminder text
-                system_reminder_lines = []
-                system_reminder_lines.append(f"Current datetime: {current_time_utc}")
+                # Prepare the system reminder lines
+                system_parts = []
+                system_parts.append(f"Current datetime: {current_time_utc}")
                 
                 # Add role if event has role attribute
-                if hasattr(event, 'role') and event.role:
-                    system_reminder_lines.append(f"Role: {event.role}")
+                # Note: Looking at the event structure, we might need to check for role differently
+                # The original code checks if hasattr(event, 'role') and event.role
+                # But based on the context.py structure, we should check the message object
+                if hasattr(event.message_obj, 'sender') and hasattr(event.message_obj.sender, 'role'):
+                    role = event.message_obj.sender.role
+                    if role:
+                        system_parts.append(f"Role: {role}")
                 
-                # Create the complete system reminder block
-                system_reminder_text = "<system_reminder>\n" + "\n".join(system_reminder_lines) + "\n</system_reminder>"
+                # Create the complete system reminder block in the same format as astr_main_agent.py
+                system_content = "<system_reminder>" + "\n".join(system_parts) + "</system_reminder>"
                 
-                # Append to system_prompt
-                if req.system_prompt is None:
-                    req.system_prompt = ""
-                req.system_prompt += f"\n{system_reminder_text}\n"
+                # Initialize extra_user_content_parts if None (safety check)
+                if req.extra_user_content_parts is None:
+                    req.extra_user_content_parts = []
                 
-                logger.debug(f"Appended UTC system reminder to system_prompt: {current_time_utc}")
+                # Append to extra_user_content_parts as a TextPart
+                req.extra_user_content_parts.append(TextPart(text=system_content))
+                
+                logger.debug(f"Appended UTC system reminder to extra_user_content_parts: {current_time_utc}")
                 
             except Exception as e:
                 logger.error(f"Error processing time for system reminder: {e}")
